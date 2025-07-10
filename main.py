@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from typing import Tuple, List
 from tqdm import tqdm
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
 
 class MistDataSet(Dataset):
     def __init__(
@@ -83,12 +85,53 @@ class VLM:
 
         print(f'Accuracy - {((correct / total) * 100):.2f}')
         return
+    
+class LinearProbe:
+    def __init__(self, model: clip.load):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = model
+    
+    @torch.no_grad
+    def feature_extraction(self, dataloader: DataLoader):
+        image_features = []
+        label_features = []
 
+        with tqdm(total = len(dataloader), unit='batch') as progress_bar:
+            for images, labels in dataloader:
+                images, labels = images.to(self.device), labels.to(self.device)
+                image_feature = self.model.encode_image(images)
+
+                image_features.append(image_feature)
+                label_features.append(labels)
+
+                progress_bar.update(1)
+
+        return torch.cat(image_features).cpu().numpy(), torch.cat(label_features).cpu().numpy()
+        
+    def validation(self, train_loader: DataLoader, test_loader: DataLoader):
+        train_features, train_labels = self.feature_extraction(train_loader)
+        test_features, test_labels = self.feature_extraction(test_loader)
+
+        clf = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=1)
+        clf.fit(train_features, train_labels)
+
+        preds = clf.predict(test_features)
+        accuracy = accuracy_score(test_labels, preds)
+        print(f"Accuracy = {accuracy* 100:.2f}")
+
+        
+            
 if __name__ == '__main__':
     classes = [str(i) for i in range(10)]
+
     vlm = VLM(classes)
+    linearprobe = LinearProbe(vlm.model)
 
     train_MNIST_dataset = MistDataSet(model_resolution=vlm.model.visual.input_resolution)
+    test_MNIST_dataset = MistDataSet(model_resolution=vlm.model.visual.input_resolution)
+
     train_loader = DataLoader(train_MNIST_dataset, shuffle=False, batch_size=500)
+    test_loader = DataLoader(test_MNIST_dataset, shuffle=False, batch_size=500)
 
     vlm.validation(train_loader)
+    linearprobe.validation(train_loader, test_loader)
