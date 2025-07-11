@@ -6,22 +6,35 @@ from PIL import Image
 import clip
 import matplotlib.pyplot as plt
 import numpy as np
-from typing import Tuple, List
+from typing import Tuple, List, Dict, Any
 from tqdm import tqdm
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
+from dataclasses import dataclass
 
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+@dataclass
+class Config:
+    device: torch.device
+    model_name: str
+    batch_size: int
+    linear_probe_c: float
+    linear_probe_max_iter: int
+    dataset_root: str
+
+    @classmethod
+    def from_dict(cls, conf: Dict[str, Any]) -> 'Config':
+        return cls(**conf)
 
 class MistDataSet(Dataset):
     def __init__(
             self,
-            root: str = "./data",
+            config: Config,
             train: bool = True,
             download: bool = True,
             model_resolution = None
         ):
-        self.base_data = torchvision.datasets.MNIST(root=root, train=train, download=download)
+        self.config = config
+        self.base_data = torchvision.datasets.MNIST(root=config.dataset_root, train=train, download=download)
         self.model_resolution = model_resolution
         self.transform = self._get_transform(model_resolution)
     
@@ -47,10 +60,11 @@ class MistDataSet(Dataset):
         ])    
 
 class ZeroShotClassification:
-    def __init__(self, clip_model: torch.nn.Module, classes: List[str]):
+    def __init__(self, config: Config, clip_model: torch.nn.Module, classes: List[str]):
+        self.config = config
         self.model = clip_model
         self.classes = classes
-        self.tokenized_classes = clip.tokenize(self.classes).to(DEVICE)
+        self.tokenized_classes = clip.tokenize(self.classes).to(self.config.device)
     
     @torch.inference_mode()
     def predict(self, images: torch.Tensor) -> torch.Tensor:
@@ -73,7 +87,7 @@ class ZeroShotClassification:
         with tqdm(total=len(dataloader), unit="Zero-Shot Batches") as progress_bar:
 
             for images, labels in dataloader:
-                images, labels = images.to(DEVICE), labels.to(DEVICE)
+                images, labels = images.to(self.config.device), labels.to(self.config.device)
 
                 predictions = self.predict(images)
                 correct += (predictions == labels).sum().item()
@@ -85,7 +99,8 @@ class ZeroShotClassification:
         return
     
 class LinearProbe:
-    def __init__(self, clip_model: torch.nn.Module):
+    def __init__(self, config:Config, clip_model: torch.nn.Module):
+        self.config = config
         self.model = clip_model
     
     @torch.inference_mode()
@@ -95,7 +110,7 @@ class LinearProbe:
 
         with tqdm(total = len(dataloader), unit='Feature Extraction') as progress_bar:
             for images, labels in dataloader:
-                images, labels = images.to(DEVICE), labels.to(DEVICE)
+                images, labels = images.to(self.config.device), labels.to(self.config.device)
 
                 features = self.model.encode_image(images)
                 all_features.append(features)
@@ -109,7 +124,12 @@ class LinearProbe:
         train_features, train_labels = self.extract_features(train_loader)
         test_features, test_labels = self.extract_features(test_loader)
 
-        clf = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=1)
+        clf = LogisticRegression(
+            random_state=0,
+            C=self.config.linear_probe_c,
+            max_iter=self.config.linear_probe_max_iter,
+            verbose=1
+        )
         clf.fit(train_features, train_labels)
 
         preds = clf.predict(test_features)
@@ -119,22 +139,32 @@ class LinearProbe:
         
             
 def main():
+    conf_dict = {
+        'device': torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+        'model_name': 'ViT-B/16',
+        'batch_size': 500,
+        'linear_probe_c': 0.316,
+        'linear_probe_max_iter': 1000,
+        'dataset_root': './data'
+    }
+    
+    config = Config.from_dict(conf_dict)
     classes = [str(i) for i in range(10)]
 
-    clip_model, preprocess = clip.load('ViT-B/16', device=DEVICE)
+    clip_model, preprocess = clip.load(config.model_name, device=config.device)
     model_resolution = clip_model.visual.input_resolution
 
 
-    train_MNIST_dataset = MistDataSet(model_resolution=model_resolution)
-    test_MNIST_dataset = MistDataSet(model_resolution=model_resolution)
+    train_MNIST_dataset = MistDataSet(config=config, model_resolution=model_resolution)
+    test_MNIST_dataset = MistDataSet(config=config, model_resolution=model_resolution)
 
-    train_loader = DataLoader(train_MNIST_dataset, shuffle=True, batch_size=500)
-    test_loader = DataLoader(test_MNIST_dataset, shuffle=False, batch_size=500)
+    train_loader = DataLoader(train_MNIST_dataset, shuffle=True, batch_size=config.batch_size)
+    test_loader = DataLoader(test_MNIST_dataset, shuffle=False, batch_size=config.batch_size)
 
-    zer_shot = ZeroShotClassification(clip_model, classes)
+    zer_shot = ZeroShotClassification(config, clip_model, classes)
     zer_shot.evaluate(train_loader)
 
-    linear_probe = LinearProbe(clip_model)
+    linear_probe = LinearProbe(config, clip_model)
     linear_probe.train_and_evaluate(train_loader, test_loader)
 
 if __name__ == '__main__':
