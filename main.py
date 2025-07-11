@@ -60,42 +60,58 @@ class MistDataSet(Dataset):
         ])    
 
 class ZeroShotClassification:
-    def __init__(self, config: Config, clip_model: torch.nn.Module, classes: List[str]):
+    def __init__(self, config: Config, clip_model: torch.nn.Module, classes: List[List[str]]):
         self.config = config
         self.model = clip_model
         self.classes = classes
-        self.tokenized_classes = clip.tokenize(self.classes).to(self.config.device)
+        self.tokenized_classes: List[torch.Tensor] = [
+            clip.tokenize(target_cls).to(self.config.device)
+            for target_cls in self.classes
+        ]
     
     @torch.inference_mode()
-    def predict(self, images: torch.Tensor) -> torch.Tensor:
+    def predict(self, images: torch.Tensor) -> List[int]:
         image_features = self.model.encode_image(images)
-        text_features = self.model.encode_text(self.tokenized_classes)
-        
-        # Normalize
+        # Image normalization
         image_features /= image_features.norm(dim=-1, keepdim=True)
-        text_features /= text_features.norm(dim=-1, keepdim=True)
-        
-        # Dot-product
-        similarities = image_features @ text_features.T
-        
-        probs = (100.0 * similarities).softmax(dim=-1)
-        return probs.argmax(dim=1)
 
+        classes_probs_argmax: List[int] = []
+
+        for count in range(len(self.classes)):
+            text_features = self.model.encode_text(self.tokenized_classes[count])
+            
+            # target class Normalization
+            text_features /= text_features.norm(dim=-1, keepdim=True)
+            
+            # Dot-product
+            similarities = image_features @ text_features.T
+            
+            probs = (100.0 * similarities).softmax(dim=-1)
+            max_idx = probs.argmax(dim=1)
+            classes_probs_argmax.append(max_idx)
+            
+        return classes_probs_argmax
+    
     def evaluate(self, dataloader: DataLoader):
-        correct, total = 0, 0
+        # correct, total = 0, 0
+        total = 0
+        correct_list: List[int] = [0 for _ in range(len(self.tokenized_classes))]
+        # print(len(correct_list))
 
         with tqdm(total=len(dataloader), unit="Zero-Shot Batches") as progress_bar:
 
             for images, labels in dataloader:
                 images, labels = images.to(self.config.device), labels.to(self.config.device)
-
+                
                 predictions = self.predict(images)
-                correct += (predictions == labels).sum().item()
+                for count, preds in enumerate(predictions, start=0):
+                    # print(count)
+                    correct_list[count] += (preds == labels).sum().item()
                 total += labels.size(0)
 
                 progress_bar.update(1)
-
-        print(f'Zero-Shot accuracy: {((correct / total) * 100):.2f}')
+        for count, target_class in enumerate(correct_list, start=0):
+            print(f'Zero-Shot accuracy for (ex: {self.classes[count][0]}) is: {((target_class / total) * 100):.2f}')
         return
     
 class LinearProbe:
@@ -160,24 +176,29 @@ def main():
     test_loader = DataLoader(test_MNIST_dataset, shuffle=False, batch_size=config.batch_size)
 
     print("---evaluate Zero-Shot on original target names---")
-    classes = [str(i) for i in range(10)]
+    classes = [
+        [str(i) for i in range(10)],
+        [f'this is a image of {str(i)}' for i in range(10)],
+        [f'there is a {str(i)} digit in a picture' for i in range(10)],
+        [f'the picture of handwritten of {str(i)}' for i in range(10)],
+    ]
     zer_shot = ZeroShotClassification(config, clip_model, classes)
     zer_shot.evaluate(train_loader)
 
-    print("---evaluate Zero-Shot on descriptive of target names---")
-    classes = [f'this is a image of {str(i)}' for i in range(10)]
-    zer_shot = ZeroShotClassification(config, clip_model, classes)
-    zer_shot.evaluate(train_loader)
+    # print("---evaluate Zero-Shot on descriptive of target names---")
+    # classes = [f'this is a image of {str(i)}' for i in range(10)]
+    # zer_shot = ZeroShotClassification(config, clip_model, classes)
+    # zer_shot.evaluate(train_loader)
 
-    print("---evaluate Zero-Shot on descriptive V2 target names---")
-    classes = [f'there is a {str(i)} digit in a picture' for i in range(10)]
-    zer_shot = ZeroShotClassification(config, clip_model, classes)
-    zer_shot.evaluate(train_loader)
+    # print("---evaluate Zero-Shot on descriptive V2 target names---")
+    # classes = [f'there is a {str(i)} digit in a picture' for i in range(10)]
+    # zer_shot = ZeroShotClassification(config, clip_model, classes)
+    # zer_shot.evaluate(train_loader)
     
-    print("---evaluate Zero-Shot with handwritten target names---")
-    classes = [f'the picture of handwritten of {str(i)}' for i in range(10)]
-    zer_shot = ZeroShotClassification(config, clip_model, classes)
-    zer_shot.evaluate(train_loader)
+    # print("---evaluate Zero-Shot with handwritten target names---")
+    # classes = [f'the picture of handwritten of {str(i)}' for i in range(10)]
+    # zer_shot = ZeroShotClassification(config, clip_model, classes)
+    # zer_shot.evaluate(train_loader)
 
     print("---evaluate Linear Probe---")
     linear_probe = LinearProbe(config, clip_model)
