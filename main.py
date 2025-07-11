@@ -152,7 +152,12 @@ class LinearProbe:
         accuracy = accuracy_score(test_labels, preds) * 100
         print(f"Linear Probe accuracy = {accuracy:.2f}")
 
-        
+def prepare_dataloaders(config: Config, resolution: int) -> Tuple[DataLoader, DataLoader]:
+    train_set = MistDataSet(config=config, train=True, model_resolution=resolution)
+    test_set = MistDataSet(config=config, train=False, model_resolution=resolution)
+    train_loader = DataLoader(train_set, shuffle=True, batch_size=config.batch_size)
+    test_loader = DataLoader(test_set, shuffle=False, batch_size=config.batch_size)
+    return train_loader, test_loader        
             
 def main():
     conf_dict = {
@@ -169,11 +174,7 @@ def main():
     clip_model, preprocess = clip.load(config.model_name, device=config.device)
     model_resolution = clip_model.visual.input_resolution
 
-    train_MNIST_dataset = MistDataSet(config=config, train=True, model_resolution=model_resolution)
-    test_MNIST_dataset = MistDataSet(config=config, train=False, model_resolution=model_resolution)
-
-    train_loader = DataLoader(train_MNIST_dataset, shuffle=True, batch_size=config.batch_size)
-    test_loader = DataLoader(test_MNIST_dataset, shuffle=False, batch_size=config.batch_size)
+    train_loader, test_loader = prepare_dataloaders(config, model_resolution)
 
     print("---evaluate Zero-Shot on original target names---")
     classes = [
