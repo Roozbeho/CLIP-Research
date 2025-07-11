@@ -44,4 +44,4 @@ class LinearProbe:
 
         preds = clf.predict(test_features)
         accuracy = accuracy_score(test_labels, preds) * 100
-        print(f"Linear Probe accuracy = {accuracy:.2f}")
+        return accuracy

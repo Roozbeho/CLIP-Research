@@ -22,16 +22,16 @@ def main():
         'linear_probe_max_iter': 1000,
         'dataset_root': './data'
     }
-    
     config = Config.from_dict(conf_dict)
 
     clip_model, preprocess = clip.load(config.model_name, device=config.device)
     model_resolution = clip_model.visual.input_resolution
 
-    print("---preparing data---")
+    print("Loading and prepairing data")
     train_loader, test_loader = prepare_dataloaders(config, model_resolution)
 
-    print("---evaluate Zero-Shot on original target names---")
+    print("="*50)
+    print("Evaluating Zero-Shot Performance")
     classes = [
         [str(i) for i in range(10)],
         [f'this is a image of {str(i)}' for i in range(10)],
@@ -40,12 +40,18 @@ def main():
     ]
 
     zero_shot = ZeroShotClassification(config, clip_model, classes)
-    zero_shot.evaluate(train_loader)
+    zero_shot_accuracies = zero_shot.evaluate(train_loader)
 
+    print("Zero-Shot accuracies:")
+    for i, acc in enumerate(zero_shot_accuracies):
+        print(f"(ex: {classes[i][0]}) : {acc:.2f}")
 
-    print("---evaluate Linear Probe---")
+    print("="*50)
+    print("Evaluating Linear Probe Performance")
     linear_probe = LinearProbe(config, clip_model)
-    linear_probe.train_and_evaluate(train_loader, test_loader)
+    linear_probe_accuracies = linear_probe.train_and_evaluate(train_loader, test_loader)
+
+    print(f"Linear Probe accuracies : {linear_probe_accuracies:.2f}")
 
 if __name__ == '__main__':
     main()

@@ -11,27 +11,34 @@ class ZeroShotClassification:
         self.config = config
         self.model = clip_model
         self.classes = classes
-        self.tokenized_classes: List[torch.Tensor] = [
-            clip.tokenize(target_cls).to(self.config.device)
-            for target_cls in self.classes
-        ]
+        self.text_features = self._text_tokenizer()
+    
+    @torch.inference_mode()
+    def _text_tokenizer(self) -> List[torch.Tensor]:
+        """
+        Separate class tokenization logic to avoid recomputing text features
+        during the evaluation process.
+        """
+        text_features: List[torch.Tensor] = []
+
+        for target_cls in self.classes:
+            tokenized_text = clip.tokenize(target_cls).to(self.config.device)
+            encoded_text = self.model.encode_text(tokenized_text)
+            encoded_text /= encoded_text.norm(dim=-1, keepdim=True) # target class Normalization
+
+            text_features.append(encoded_text)
+
+        return text_features
     
     @torch.inference_mode()
     def predict(self, images: torch.Tensor) -> List[int]:
-        image_features = self.model.encode_image(images)
-        # Image normalization
-        image_features /= image_features.norm(dim=-1, keepdim=True)
-
         classes_probs_argmax: List[int] = []
 
+        image_features = self.model.encode_image(images)
+        image_features /= image_features.norm(dim=-1, keepdim=True) # Image normalization
+
         for count in range(len(self.classes)):
-            text_features = self.model.encode_text(self.tokenized_classes[count])
-            
-            # target class Normalization
-            text_features /= text_features.norm(dim=-1, keepdim=True)
-            
-            # Dot-product
-            similarities = image_features @ text_features.T
+            similarities = image_features @ self.text_features[count].T # Dot-product
             
             probs = (100.0 * similarities).softmax(dim=-1)
             max_idx = probs.argmax(dim=1)
@@ -40,7 +47,7 @@ class ZeroShotClassification:
         return classes_probs_argmax
     
     def evaluate(self, dataloader: DataLoader):
-        correct_list = [0 for _ in range(len(self.tokenized_classes))]
+        correct_list = [0 for _ in range(len(self.text_features))]
         total = 0
 
         with tqdm(total=len(dataloader), unit="Zero-Shot Batches") as progress_bar:
@@ -55,7 +62,5 @@ class ZeroShotClassification:
                 total += labels.size(0)
 
                 progress_bar.update(1)
-        
-        for count, target_class in enumerate(correct_list, start=0):
-            print(f'Zero-Shot accuracy for (ex: {self.classes[count][0]}) is: {((target_class / total) * 100):.2f}')
-        return
+
+        return [(acc/total)*100 for acc in correct_list]
