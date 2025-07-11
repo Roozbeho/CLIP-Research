@@ -14,6 +14,7 @@ class Config:
     linear_probe_c: float
     linear_probe_max_iter: int
     dataset_root: str
+    save_visualization: bool
 
     @classmethod
     def from_dict(cls, conf: Dict[str, Any]) -> 'Config':
