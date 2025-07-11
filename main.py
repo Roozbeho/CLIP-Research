@@ -149,21 +149,37 @@ def main():
     }
     
     config = Config.from_dict(conf_dict)
-    classes = [str(i) for i in range(10)]
 
     clip_model, preprocess = clip.load(config.model_name, device=config.device)
     model_resolution = clip_model.visual.input_resolution
 
-
-    train_MNIST_dataset = MistDataSet(config=config, model_resolution=model_resolution)
-    test_MNIST_dataset = MistDataSet(config=config, model_resolution=model_resolution)
+    train_MNIST_dataset = MistDataSet(config=config, train=True, model_resolution=model_resolution)
+    test_MNIST_dataset = MistDataSet(config=config, train=False, model_resolution=model_resolution)
 
     train_loader = DataLoader(train_MNIST_dataset, shuffle=True, batch_size=config.batch_size)
     test_loader = DataLoader(test_MNIST_dataset, shuffle=False, batch_size=config.batch_size)
 
+    print("---evaluate Zero-Shot on original target names---")
+    classes = [str(i) for i in range(10)]
     zer_shot = ZeroShotClassification(config, clip_model, classes)
     zer_shot.evaluate(train_loader)
 
+    print("---evaluate Zero-Shot on descriptive of target names---")
+    classes = [f'this is a image of {str(i)}' for i in range(10)]
+    zer_shot = ZeroShotClassification(config, clip_model, classes)
+    zer_shot.evaluate(train_loader)
+
+    print("---evaluate Zero-Shot on descriptive V2 target names---")
+    classes = [f'there is a {str(i)} digit in a picture' for i in range(10)]
+    zer_shot = ZeroShotClassification(config, clip_model, classes)
+    zer_shot.evaluate(train_loader)
+    
+    print("---evaluate Zero-Shot with handwritten target names---")
+    classes = [f'the picture of handwritten of {str(i)}' for i in range(10)]
+    zer_shot = ZeroShotClassification(config, clip_model, classes)
+    zer_shot.evaluate(train_loader)
+
+    print("---evaluate Linear Probe---")
     linear_probe = LinearProbe(config, clip_model)
     linear_probe.train_and_evaluate(train_loader, test_loader)
 
