@@ -1,10 +1,12 @@
 from typing import List
 
 import clip
-from tqdm import tqdm
-from utils.config import Config
 import torch
 from torch.utils.data import DataLoader
+from tqdm import tqdm
+
+from utils.config import Config
+
 
 class ZeroShotClassification:
     """
@@ -32,12 +34,18 @@ class ZeroShotClassification:
     evaluate(dataloader: DataLoader)
         Evaluates the model on a given data loader.
     """
-    def __init__(self, config: Config, clip_model: torch.nn.Module, classes: List[List[str]]):
+
+    def __init__(
+        self,
+        config: Config,
+        clip_model: torch.nn.Module,
+        classes: List[List[str]],
+    ):
         self.config = config
         self.model = clip_model
         self.classes = classes
         self.text_features = self._text_tokenizer()
-    
+
     @torch.inference_mode()
     def _text_tokenizer(self) -> List[torch.Tensor]:
         """
@@ -49,12 +57,14 @@ class ZeroShotClassification:
         for target_cls in self.classes:
             tokenized_text = clip.tokenize(target_cls).to(self.config.device)
             encoded_text = self.model.encode_text(tokenized_text)
-            encoded_text /= encoded_text.norm(dim=-1, keepdim=True) # target class Normalization
+            encoded_text /= encoded_text.norm(
+                dim=-1, keepdim=True
+            )  # target class Normalization
 
             text_features.append(encoded_text)
 
         return text_features
-    
+
     @torch.inference_mode()
     def predict(self, images: torch.Tensor) -> List[int]:
         """
@@ -63,17 +73,19 @@ class ZeroShotClassification:
         classes_probs_argmax: List[int] = []
 
         image_features = self.model.encode_image(images)
-        image_features /= image_features.norm(dim=-1, keepdim=True) # Image normalization
+        image_features /= image_features.norm(
+            dim=-1, keepdim=True
+        )  # Image normalization
 
         for count in range(len(self.classes)):
-            similarities = image_features @ self.text_features[count].T # Dot-product
-            
+            similarities = image_features @ self.text_features[count].T  # Dot-product
+
             probs = (100.0 * similarities).softmax(dim=-1)
             max_idx = probs.argmax(dim=1)
             classes_probs_argmax.append(max_idx)
-            
+
         return classes_probs_argmax
-    
+
     def evaluate(self, dataloader: DataLoader):
         """
         Evaluates the model on a given data loader.
@@ -89,8 +101,10 @@ class ZeroShotClassification:
         with tqdm(total=len(dataloader), unit="Zero-Shot Batches") as progress_bar:
 
             for images, labels in dataloader:
-                images, labels = images.to(self.config.device), labels.to(self.config.device)
-                
+                images, labels = images.to(self.config.device), labels.to(
+                    self.config.device
+                )
+
                 predictions = self.predict(images)
                 for count, preds in enumerate(predictions, start=0):
                     # print(count)
@@ -99,4 +113,4 @@ class ZeroShotClassification:
 
                 progress_bar.update(1)
 
-        return [(acc/total)*100 for acc in correct_list]
+        return [(acc / total) * 100 for acc in correct_list]

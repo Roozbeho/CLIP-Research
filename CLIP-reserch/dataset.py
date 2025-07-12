@@ -1,10 +1,12 @@
 from typing import Tuple
 
 import torch
-from utils.config import Config
-from torch.utils.data import Dataset
 import torchvision
+from torch.utils.data import Dataset
 from torchvision import transforms
+
+from utils.config import Config
+
 
 class MistDataSet(Dataset):
     """
@@ -32,13 +34,14 @@ class MistDataSet(Dataset):
     _get_transform(n_px: int) -> transforms.Compose
         Returns a composition of image transformations.
     """
+
     def __init__(
-            self,
-            config: Config,
-            train: bool = True,
-            download: bool = True,
-            model_resolution = None
-        ):
+        self,
+        config: Config,
+        train: bool = True,
+        download: bool = True,
+        model_resolution=None,
+    ):
         """
         Initializes the dataset object.
 
@@ -54,10 +57,12 @@ class MistDataSet(Dataset):
             Resolution of the model (used for image transformations) (default: None).
         """
         self.config = config
-        self.base_data = torchvision.datasets.MNIST(root=config.dataset_root, train=train, download=download)
+        self.base_data = torchvision.datasets.MNIST(
+            root=config.dataset_root, train=train, download=download
+        )
         self.model_resolution = model_resolution
         self.transform = self._get_transform(model_resolution)
-    
+
     def __len__(self) -> int:
         return len(self.base_data)
 
@@ -66,7 +71,7 @@ class MistDataSet(Dataset):
 
         if self.transform:
             img = self.transform(img)
-        
+
         return img, label
 
     @staticmethod
@@ -81,10 +86,17 @@ class MistDataSet(Dataset):
         n_px : int
             Resolution of the model.
         """
-        return transforms.Compose([
-        transforms.Resize(n_px, interpolation=transforms.InterpolationMode.BICUBIC),
-        transforms.CenterCrop(n_px),
-        transforms.Lambda(lambda x: x.convert("RGB")),
-        transforms.ToTensor(),
-        transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
-        ]) 
+        return transforms.Compose(
+            [
+                transforms.Resize(
+                    n_px, interpolation=transforms.InterpolationMode.BICUBIC
+                ),
+                transforms.CenterCrop(n_px),
+                transforms.Lambda(lambda x: x.convert("RGB")),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    (0.48145466, 0.4578275, 0.40821073),
+                    (0.26862954, 0.26130258, 0.27577711),
+                ),
+            ]
+        )

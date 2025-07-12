@@ -1,7 +1,5 @@
-
-
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import Any, Dict
 
 import torch
 
@@ -39,6 +37,7 @@ class Config:
     Config
         A Config instance with the specified settings.
     """
+
     device: torch.device
     model_name: str
     batch_size: int
@@ -48,5 +47,5 @@ class Config:
     save_visualization: bool
 
     @classmethod
-    def from_dict(cls, conf: Dict[str, Any]) -> 'Config':
+    def from_dict(cls, conf: Dict[str, Any]) -> "Config":
         return cls(**conf)
