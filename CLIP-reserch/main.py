@@ -1,5 +1,5 @@
 import clip
-
+import argparse
 from linear_probe import LinearProbe
 from zero_shot import ZeroShotClassification
 from utils.config import Config
@@ -9,14 +9,32 @@ import torch
 
 
 def main():
+    parser = argparse.ArgumentParser(description="CLIP Reserch (Zero-shot & Linear Probe)")
+    parser.add_argument("--cuda", action=argparse.BooleanOptionalAction, default=True,
+                        help="Use CUDA if available (default: True)")
+    parser.add_argument("-mn", "--model-name", type=str, default='ViT-B/16',
+                        help="CLIP model name (default: ViT-B/16)")
+    parser.add_argument("-b", "--batch-size", type=int, default=500,
+                        help="Batch size during evaluation (default: 500)")
+    parser.add_argument("-c", "--linear-probe-c", type=float, default=0.316,
+                        help="Regularization parameter C for logistic regression (default: 0.316)")
+    parser.add_argument("-mi", "--linear-probe-max-iter", type=int, default=1000,
+                        help="Maximum iterations for logistic regression (default: 1000)")
+    parser.add_argument("-d", "--dataset-root", type=str, default="./data",
+                        help="Path to dataset root directory (default: ./data)")
+    parser.add_argument("-v", "--visualize", action=argparse.BooleanOptionalAction, default=False,
+                        help="Flag for Saving visual report to file (default: False)")
+    
+    args = parser.parse_args()
+
     conf_dict = {
-        'device': torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
-        'model_name': 'ViT-B/16',
-        'batch_size': 500,
-        'linear_probe_c': 0.316,
-        'linear_probe_max_iter': 1000,
-        'dataset_root': './data',
-        'save_visualization': False
+        'device': torch.device('cuda' if (torch.cuda.is_available() and args.cuda) else 'cpu'),
+        'model_name': args.model_name,
+        'batch_size': args.batch_size,
+        'linear_probe_c': args.linear_probe_c,
+        'linear_probe_max_iter': args.linear_probe_max_iter,
+        'dataset_root': args.dataset_root,
+        'save_visualization': args.visualize
     }
     config = Config.from_dict(conf_dict)
 
@@ -60,9 +78,10 @@ def main():
 
     print(f"Linear Probe accuracies : {linear_probe_accuracies:.2f}")
 
-    print("="*50)
-    print("Preparing visualization report")
-    visualize(classes, zero_shot_accuracies, linear_probe_accuracies, config.save_visualization)
+    if args.visualize:
+        print("="*50)
+        print("Preparing visualization report")
+        visualize(classes, zero_shot_accuracies, linear_probe_accuracies, config.save_visualization)
 
 if __name__ == '__main__':
     main()
