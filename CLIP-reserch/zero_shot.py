@@ -7,6 +7,31 @@ import torch
 from torch.utils.data import DataLoader
 
 class ZeroShotClassification:
+    """
+    Zero-shot classification using CLIP model.
+
+    Attributes:
+    ----------
+    config : Config
+        Configuration object containing model settings.
+    model : torch.nn.Module
+        CLIP model.
+    classes : List[List[str]]
+        List of classes for classification.
+    text_features : List[torch.Tensor]
+        Pre-computed text features for classes.
+
+    Methods:
+    -------
+    __init__(config: Config, clip_model: torch.nn.Module, classes: List[List[str]])
+        Initializes the zero-shot classification object.
+    _text_tokenizer() -> List[torch.Tensor]
+        Pre-computes text features for classes.
+    predict(images: torch.Tensor) -> List[int]
+        Predicts class labels for given images.
+    evaluate(dataloader: DataLoader)
+        Evaluates the model on a given data loader.
+    """
     def __init__(self, config: Config, clip_model: torch.nn.Module, classes: List[List[str]]):
         self.config = config
         self.model = clip_model
@@ -32,6 +57,9 @@ class ZeroShotClassification:
     
     @torch.inference_mode()
     def predict(self, images: torch.Tensor) -> List[int]:
+        """
+        Predicts class labels for given images.
+        """
         classes_probs_argmax: List[int] = []
 
         image_features = self.model.encode_image(images)
@@ -47,6 +75,14 @@ class ZeroShotClassification:
         return classes_probs_argmax
     
     def evaluate(self, dataloader: DataLoader):
+        """
+        Evaluates the model on a given data loader.
+
+        Returns:
+        -------
+        List[float]
+            List of accuracy scores for each class.
+        """
         correct_list = [0 for _ in range(len(self.text_features))]
         total = 0
 

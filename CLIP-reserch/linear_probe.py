@@ -9,6 +9,25 @@ from torch.utils.data import DataLoader
 import numpy as np
 
 class LinearProbe:
+    """
+    Linear probe for evaluating CLIP model features.
+
+    Attributes:
+    ----------
+    config : Config
+        Configuration object containing model settings.
+    model : torch.nn.Module
+        CLIP model.
+
+    Methods:
+    -------
+    __init__(config: Config, clip_model: torch.nn.Module)
+        Initializes the linear probe object.
+    extract_features(dataloader: DataLoader) -> Tuple[np.ndarray, np.ndarray]
+        Extracts features (training, testing) from a data loader.
+    train_and_evaluate(train_loader: DataLoader, test_loader: DataLoader)
+        Trains and evaluates a logistic regression model on the extracted features.
+    """
     def __init__(self, config:Config, clip_model: torch.nn.Module):
         self.config = config
         self.model = clip_model

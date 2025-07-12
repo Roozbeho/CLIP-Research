@@ -1,6 +1,3 @@
-# TODO: Add visualization of accuracies
-# TODO: Add docs and comment in code for readability
-
 import clip
 
 from linear_probe import LinearProbe
