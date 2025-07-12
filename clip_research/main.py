@@ -15,7 +15,7 @@ def main():
         description="CLIP Reserch (Zero-shot & Linear Probe)"
     )
     parser.add_argument(
-        "--cuda",
+        "--no-cuda",
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Use CUDA if available (default: True)",
@@ -67,7 +67,7 @@ def main():
 
     conf_dict = {
         "device": torch.device(
-            "cuda" if (torch.cuda.is_available() and args.cuda) else "cpu"
+            "cuda" if (torch.cuda.is_available() and args.no_cuda) else "cpu"
         ),
         "model_name": args.model_name,
         "batch_size": args.batch_size,
