@@ -1,6 +1,6 @@
 # CLIP Research: Zero-Shot vs. Linear Probe Classification
 
-This project provides a comprehensive evaluation and comparison of two powerful classification techniques using pre-trained CLIP models: **Zero-Shot Classification** and **Linear Probe Fine-Tuning**. The experiments are conducted on the MNIST dataset of handwritten digits, exploring how different text prompts and evaluation methods impact model performance.
+This project provides a comprehensive evaluation and comparison of two classification techniques using pre-trained CLIP models: **Zero-Shot Classification** and **Linear Probe**. The experiments are conducted on the MNIST dataset of handwritten digits, exploring how different text prompts and evaluation methods impact model performance.
 
 The entire codebase is designed with a clean, modular architecture and is controlled with a flexible command-line interface.
 
